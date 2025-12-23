@@ -276,6 +276,7 @@
         let cameraX = 0;
         let cameraY = 0;
         let isMouseDown = false;
+		const mouse = { x: 0, y: 0 };
         // Input handling
         const keys = {};
         
@@ -294,7 +295,7 @@
         let skillPoints = 0;
         let epsilon = 30;
 		let epsilon_decay = 0.9999;
-		let player_class = 'twin';
+		let player_class = 'trapper';
         // Upgrades
         let upgrades = {
 		    health_reg: 0,
@@ -336,8 +337,9 @@
         class Tank {
             constructor(x, y, isPlayer = false) {
 			    this.class = 'tank';
-			    if(isPlayer == false){
-				   const classes = ['tank', 'twin', 'sniper', 'machine_gun', 'flank_guard'];
+			    if(isPlayer == false){ // <CLASS>
+				   const classes = ['tank', 'twin', 'sniper', 'machine_gun', 'flank_guard' , 'destroyer' , 'gunner',
+				   'tri_angle', 'twin_flank', 'quad_tank' , 'auto_3', 'assasin' , 'tripleshot' , 'overseer' , 'hunter', 'trapper'];
                    this.class = classes[Math.floor(Math.random() * classes.length)];
 				}
 				else{
@@ -365,21 +367,28 @@
 				this.bullet_speed = 9;
 				this.bullet_pen = 10;
 				this.bullet_damage = 7;
-				
+			
 				this.entity_level = isPlayer ? level : (Math.floor(Math.random() * 45) + 1)
 				
-				// handle classes;
-				if(this.class == 'machine_gun'){
+				// handle classes; <CLASS>
+				if(this.class == 'machine_gun' || this.class == 'auto_3'){
 				    this.shootCooldown = 120;
 				}
 				else if(this.class == 'sniper'){
 				    this.shootCooldown = 700;
 				}
-				else if(this.class == 'flank_guard'){
+				else if(this.class == 'flank_guard' || this.class == 'tri_angle' || this.class == 'quad_tank' || this.class == 'twin_flank'){
 				    this.shootCooldown = 300;
 				}
-				else if(this.class == 'twin'){
+				else if(this.class == 'twin' || this.class == 'tripleshot'){
 				    this.shootCooldown = 230;
+				}
+				else if(this.class == 'destroyer'){
+				    this.shootCooldown = 2000;
+				}
+				else if(this.class == 'assasin'){
+				    this.shootCooldown = 700;
+					
 				}
 				
 				
@@ -419,9 +428,22 @@
                     active: false            // New flag to track active state
                 };
 				this.recoilForce = 0;
-                this.maxRecoil = this.isPlayer ? 1.5 : 1; // Enemy gets stronger recoil
+                this.maxRecoil = this.isPlayer ? 2 : 1; // I get
 				if(this.class =='flank_guard'){
 				     this.maxRecoil = 0;
+				}
+				else if (this.class === 'gunner') {
+                    this.barrelLength = 55;
+                    this.barrelWidth = 10;
+                }
+				else if( this.class == 'assasin'){
+				     this.barrelLength = 65;
+				}
+				else if(this.class == 'hunter'){
+				    this.barrelShake.maxIntensity = 2;
+				}
+				else if(this.class == 'flank_guard' || this.class == 'trapper'){
+				    this.barrelShake.maxIntensity = 0;
 				}
                 this.recoilDecay = 0.9;
                 this.ai = isPlayer ? null : {
@@ -797,7 +819,7 @@
 				
                 if (now - this.lastShot < cooldown) return;
 				
-				// Activate recoil systems
+				// Activate recoil systems <CLASS>
                 if (this.barrelShake.maxIntensity > 0) {
                     this.barrelShake.intensity = this.barrelShake.maxIntensity;
                     this.barrelShake.isRecoiling = false;
@@ -816,13 +838,21 @@
                     bullets.push(new Bullet(bulletX, bulletY, angle, this.isPlayer, of_class, this.bullet_speed, this.bullet_damage, this.bullet_pen));
                 };
 	            
-                // Class-specific shooting
+                // Class-specific shooting <CLASS>
                 switch (of_class) {
                     case 'flank_guard': {
 					    const spread = 0.15;
 					    const randomOffset = (Math.random() - 0.5) * spread;
                         fireBullet(this.angle + randomOffset);                     // forward
                         fireBullet(this.angle + Math.PI + randomOffset);           // backward
+                        break;
+	                }
+					case 'tripleshot': {
+					    const spread = 0.15;
+					    const randomOffset = (Math.random() - 0.5) * spread;
+                        fireBullet(this.angle + randomOffset);                     // forward
+                        fireBullet(this.angle + (0.15* Math.PI) + randomOffset);           // side
+						fireBullet(this.angle + (-0.15* Math.PI) + randomOffset);           // side
                         break;
 	                }
                     case 'twin':  {
@@ -840,12 +870,139 @@
                         fireBullet(this.angle + randomOffset);
                         break;
 	                }
-                    default: {
+					case 'gunner': {
+                        const spread = 0.12; // minor angle spread
+                        const baseAngle = this.angle;
+                        const angles = [-0.1, -0.03, 0.03, 0.1]; // simulate spread from 4 barrels
+                        //this.twinToggle = !this.twinToggle;
+						let shootgnn = [0 , 1, 0 , 1];
+						//if(this.twinToggle) {
+						    
+						//}
+						let left = false;
+                        for (let i = 0; i < angles.length; i++) {
+						    if(!shootgnn[i]) continue;
+							const tankRadius = 30;
+							const randomOffset = 0;//(Math.random() - 0.5) * spread;
+							const gnnangle = baseAngle + angles[i] + randomOffset;
+							let perpendicularAngle = gnnangle + Math.PI / 2; // 90° from tank direction
+							if(left) perpendicularAngle += Math.PI;
+                            left = !left;
+                            const edgeX = baseX + Math.cos(perpendicularAngle) * tankRadius;
+                            const edgeY = baseY + Math.sin(perpendicularAngle) * tankRadius;
+							
+							
+							let gnnbulletX = edgeX + Math.cos(gnnangle) * this.barrelLength;
+                            let gnnbulletY = edgeY + Math.sin(gnnangle) * this.barrelLength;
+							gnnbulletX -= angles[i] * 5;
+							gnnbulletY -= angles[i] * 5;
+                            bullets.push(new Bullet(gnnbulletX, gnnbulletY, gnnangle, this.isPlayer, of_class, this.bullet_speed, this.bullet_damage, this.bullet_pen));
+                            
+                        }
+						shootgnn = [1 , 0, 1 , 0];
+						for (let i = 0; i < angles.length; i++) {
+						    if(!shootgnn[i]) continue;
+							const tankRadius = 20;
+							const randomOffset = 0;//(Math.random() - 0.5) * spread;
+							const gnnangle = baseAngle + angles[i] + randomOffset;
+							let perpendicularAngle = gnnangle + Math.PI / 2; // 90° from tank direction
+							if(left) perpendicularAngle += Math.PI;
+                            left = !left;
+                            const edgeX = baseX + Math.cos(perpendicularAngle) * tankRadius;
+                            const edgeY = baseY + Math.sin(perpendicularAngle) * tankRadius;
+							
+							
+							let gnnbulletX = edgeX + Math.cos(gnnangle) * this.barrelLength;
+                            let gnnbulletY = edgeY + Math.sin(gnnangle) * this.barrelLength;
+							gnnbulletX -= angles[i] * 5;
+							gnnbulletY -= angles[i] * 5;
+                            bullets.push(new Bullet(gnnbulletX, gnnbulletY, gnnangle, this.isPlayer, of_class, this.bullet_speed, this.bullet_damage, this.bullet_pen));
+                            
+                        }
+                        break;
+                    }
+					case 'tri_angle': {
+                        const spread = 0.1; // max spread in radians
+                        const randomOffset = (Math.random() - 0.5) * spread;
+                        bullets.push(new Bullet(baseX + Math.cos(this.angle) * this.barrelLength,baseY + Math.sin(this.angle) * this.barrelLength, 
+						  this.angle + randomOffset, this.isPlayer, of_class, this.bullet_speed * 1.5, this.bullet_damage, this.bullet_pen));
+						fireBullet(this.angle + (5/6) * Math.PI); // back turrets
+						fireBullet(this.angle - (5/6) * Math.PI); // back turrets
+                        break;
+	                }
+					case 'quad_tank':{
+					    const spread = 0.15; // max spread in radians
+                        const randomOffset = (Math.random() - 0.5) * spread;
+                        fireBullet(this.angle + randomOffset);
+						fireBullet(this.angle + Math.PI + randomOffset); // back turret
+						fireBullet(this.angle - (Math.PI/2) + randomOffset); // side
+						fireBullet(this.angle + (Math.PI/2) + randomOffset); // side
+                        break;
+					
+					}
+					case 'twin_flank':{
+					    const spread = 0.15;
+					    const randomOffset = (Math.random() - 0.5) * spread;
+                        const twinOffset = 0.15; // radians
+                        const angleOffset = this.twinToggle ? -twinOffset : twinOffset;
+                        this.twinToggle = !this.twinToggle;
+                        fireBullet(this.angle + angleOffset + randomOffset);
+                        fireBullet(this.angle + angleOffset + randomOffset + Math.PI);
+						break;
+					}// ********************************************************
+					//                                                          *
+                    case 'auto_3': { /// ADD AUTO TURRET !!!                    *
+					//********************************************************  *
+					    const baseAngle = this.angle;
+					    const tankRadius = 30;
+					    const angles = [0.5 , 1 , 0];
+						const spread = 0.15; // max spread in radians
+						const randomOffset = (Math.random() - 0.5) * spread;
+						const gnnangle = baseAngle + randomOffset;
+						let triAngle = gnnangle + (2*(Math.PI / 3)); // 120° from tank direction
+					    
+                        
+						const edgeX = baseX + Math.cos(triAngle) * tankRadius;
+                        const edgeY = baseY + Math.sin(triAngle) * tankRadius;
+						
+						
+						let gnnbulletX = edgeX + Math.cos(gnnangle) * this.barrelLength;
+                        let gnnbulletY = edgeY + Math.sin(gnnangle) * this.barrelLength;
+                         bullets.push(new Bullet(gnnbulletX, gnnbulletY, gnnangle, this.isPlayer, of_class, this.bullet_speed, this.bullet_damage, this.bullet_pen));
+                        fireBullet(this.angle + randomOffset); // first
+						//fireBullet(this.angle + randomOffset); // back turret
+						//fireBullet(this.angle + randomOffset); // side
+	
+                        break;
+					}
+                    case 'hunter': {
+					
+					    const bulletX = baseX + Math.cos(this.angle) * this.barrelLength;
+                        const bulletY = baseY + Math.sin(this.angle) * this.barrelLength;
+						// small bullet
+                        bullets.push(new Bullet(bulletX, bulletY, this.angle, this.isPlayer, of_class, this.bullet_speed + 2, this.bullet_damage, this.bullet_pen, 5));
+						bullets.push(new Bullet(bulletX , bulletY, this.angle, this.isPlayer, of_class, this.bullet_speed, this.bullet_damage, this.bullet_pen, 9));
+					    break;
+					}
+					case 'trapper': {
+					    const spread = 0.55;
+					    const randomOffset = (Math.random() - 0.5) * spread;
+					    const bulletX = baseX + Math.cos(this.angle) * this.barrelLength;
+                        const bulletY = baseY + Math.sin(this.angle) * this.barrelLength;
+						// small bullet
+                        bullets.push(new Bullet(bulletX, bulletY, this.angle + randomOffset, this.isPlayer, of_class, this.bullet_speed, this.bullet_damage, this.bullet_pen));
+						
+					    break;
+					}
+					
+					// def tank.
+					default: {
 					    const spread = 0.15;
 					    const randomOffset = (Math.random() - 0.5) * spread;
                         fireBullet(this.angle + randomOffset);
                         break;
 					}
+					
                 }
             }
             
@@ -864,9 +1021,17 @@
                 ctx.save();
                 ctx.translate(this.x - cameraX, this.y - cameraY);
                 
-				// Tank barrel (DEFAULT)
+				// Tank barrel (DEFAULT) <CLASS>
 				ctx.save();
 				ctx.translate(this.barrelShake.offset.x, this.barrelShake.offset.y);
+				//
+				// to remove shake ********** OLD SYSTEM..
+				//         ctx.restore();
+				//         ctx.save();
+				//         ctx.rotate(this.angle);
+				  //       or
+				  //        this.barrelShake.maxIntensity = 0; --> in class initialization
+				// *****************************
 				ctx.rotate(this.angle);
 				if(this.class == 'tank'){
                     ctx.fillStyle = "#d3d3d3";
@@ -886,7 +1051,7 @@
                     ctx.fillRect(0, -this.barrelWidth/2.3 + offset, this.barrelLength, this.barrelWidth);
                     ctx.strokeRect(0, -this.barrelWidth/2.3 + offset, this.barrelLength, this.barrelWidth);
                 }
-				else if (this.class === 'sniper') { // twin
+				else if (this.class === 'sniper' || this.class == 'assasin') { // twin
                     // adjusted lenght;
                     ctx.fillStyle = "#d3d3d3";
                     ctx.fillRect(0, -this.barrelWidth/2, this.barrelLength * 1.15, this.barrelWidth);
@@ -921,6 +1086,248 @@
 	                
                     ctx.fill();
                     ctx.stroke();
+				}
+				else if(this.class == 'destroyer'){
+				    ctx.fillStyle = "#d3d3d3";
+                    ctx.strokeStyle = '#000';
+                    ctx.lineWidth = 2;
+	                
+                    ctx.beginPath();
+                    ctx.moveTo(0, -this.barrelWidth); // top left
+                    ctx.lineTo(this.barrelLength, -this.barrelWidth); // top right
+                    ctx.lineTo(this.barrelLength, this.barrelWidth);  // bottom right
+                    ctx.lineTo(0, this.barrelWidth);  // bottom left
+                    ctx.closePath();
+	                
+                    ctx.fill();
+                    ctx.stroke();
+				}
+				else if (this.class === 'gunner') {
+                    ctx.lineWidth = 2;
+                    ctx.fillStyle = "#d3d3d3";
+                    ctx.strokeStyle = '#000';
+                
+                    const offset = 9; // spacing between barrels
+                
+                    // Left pair
+                    ctx.fillRect(0, -this.barrelWidth/1.2 - offset - 12, this.barrelLength - 15, this.barrelWidth); // shorter one, edge
+                    ctx.strokeRect(0, -this.barrelWidth/1.2 - offset - 12, this.barrelLength - 15, this.barrelWidth);
+                    ctx.fillRect(0, this.barrelWidth/1.5 - offset - 16, this.barrelLength - 3, this.barrelWidth * 1.5);
+                    ctx.strokeRect(0, this.barrelWidth/1.5 - offset - 16, this.barrelLength - 3 , this.barrelWidth * 1.5);
+					
+                
+                    // Right pair
+					ctx.fillRect(0, this.barrelWidth/1.2 + offset + 2, this.barrelLength - 15, this.barrelWidth); // shorter one , edge
+                    ctx.strokeRect(0, this.barrelWidth/1.2 + offset + 2, this.barrelLength - 15, this.barrelWidth);
+                    ctx.fillRect(0, -this.barrelWidth/1.5 + offset + 2, this.barrelLength - 3, this.barrelWidth * 1.5);
+                    ctx.strokeRect(0, -this.barrelWidth/1.5 + offset + 2, this.barrelLength - 3, this.barrelWidth * 1.5);
+                    
+                }
+				else if(this.class == 'tri_angle'){
+				    ctx.restore();
+                    // FRONT BARREL WITH SHAKE
+                    ctx.save();
+                    ctx.rotate(this.angle);
+                    ctx.fillStyle = "#d3d3d3";
+                    ctx.fillRect(0, -this.barrelWidth/2, this.barrelLength, this.barrelWidth);
+                    ctx.strokeStyle = '#000';
+                    ctx.lineWidth = 2;
+                    ctx.strokeRect(0, -this.barrelWidth/2, this.barrelLength, this.barrelWidth);
+                    ctx.restore(); // restore after front barrel
+	                
+                    // BACK BARRELS WITHOUT SHAKE
+                    ctx.save();
+                    ctx.rotate(this.angle);
+	                ctx.translate(this.barrelShake.offset.x, this.barrelShake.offset.y); // shake only here
+                    ctx.rotate((5/6) * Math.PI);
+                    ctx.fillStyle = "#d3d3d3";
+                    ctx.fillRect(0, -this.barrelWidth/2, this.barrelLength * (5/6), this.barrelWidth);
+                    ctx.strokeStyle = '#000';
+                    ctx.lineWidth = 2;
+                    ctx.strokeRect(0, -this.barrelWidth/2, this.barrelLength * (5/6), this.barrelWidth);
+	                
+                    ctx.rotate(-2 * (5/6) * Math.PI);
+                    ctx.fillRect(0, -this.barrelWidth/2, this.barrelLength * (5/6), this.barrelWidth);
+                    ctx.strokeRect(0, -this.barrelWidth/2, this.barrelLength * (5/6), this.barrelWidth);
+                }
+				else if (this.class === 'quad_tank') {
+				   ctx.restore();
+				   ctx.save();
+				   ctx.rotate(this.angle);
+				   
+                   // Front barrel
+				   ctx.lineWidth = 2;
+				   ctx.fillStyle = "#d3d3d3";
+				   ctx.strokeStyle = '#000';
+                   ctx.fillRect(0, -this.barrelWidth/2, this.barrelLength, this.barrelWidth);
+                   ctx.strokeRect(0, -this.barrelWidth/2, this.barrelLength, this.barrelWidth);
+                   
+                   // Back barrel (rotate 180 degrees)
+                   ctx.rotate(Math.PI);
+                   ctx.fillRect(0, -this.barrelWidth/2, this.barrelLength, this.barrelWidth);
+                   ctx.strokeRect(0, -this.barrelWidth/2, this.barrelLength, this.barrelWidth);
+				   
+				   ctx.rotate(Math.PI/2);
+				   ctx.fillRect(0, -this.barrelWidth/2, this.barrelLength, this.barrelWidth);
+                   ctx.strokeRect(0, -this.barrelWidth/2, this.barrelLength, this.barrelWidth);
+				   
+				   ctx.rotate(Math.PI);
+				   ctx.fillRect(0, -this.barrelWidth/2, this.barrelLength, this.barrelWidth);
+                   ctx.strokeRect(0, -this.barrelWidth/2, this.barrelLength, this.barrelWidth);
+                }
+				else if (this.class === 'twin_flank') { // twin flank
+				    ctx.restore();
+				   ctx.save();
+				   ctx.rotate(this.angle);
+				    ctx.lineWidth = 2;
+                    ctx.fillStyle = "#d3d3d3";
+                    const offset = 15;
+					
+                    ctx.fillRect(0, -this.barrelWidth/2.3 - offset - 3, this.barrelLength, this.barrelWidth);
+					ctx.strokeStyle = '#000';
+                    ctx.strokeRect(0, -this.barrelWidth/2.3 - offset - 3, this.barrelLength, this.barrelWidth);
+                    ctx.fillRect(0, -this.barrelWidth/2.3 + offset, this.barrelLength, this.barrelWidth);
+                    ctx.strokeRect(0, -this.barrelWidth/2.3 + offset, this.barrelLength, this.barrelWidth);
+					ctx.rotate(Math.PI);
+					ctx.fillRect(0, -this.barrelWidth/2.3 - offset - 3, this.barrelLength, this.barrelWidth);
+					ctx.strokeStyle = '#000';
+                    ctx.strokeRect(0, -this.barrelWidth/2.3 - offset - 3, this.barrelLength, this.barrelWidth);
+                    ctx.fillRect(0, -this.barrelWidth/2.3 + offset, this.barrelLength, this.barrelWidth);
+                    ctx.strokeRect(0, -this.barrelWidth/2.3 + offset, this.barrelLength, this.barrelWidth);
+                }
+				else if (this.class == 'auto_3') {// Looks crazy good!
+				        ctx.restore();
+						ctx.save();
+						ctx.rotate(this.angle);
+                        for (let i = 0; i < 3; i++) {
+						   
+                            const baseAngle = this.angle + i * (2 * Math.PI / 3);
+                            const turretOffset = 30;
+							const bx = this.x + Math.cos(baseAngle) * turretOffset;
+                            const by = this.y + Math.sin(baseAngle) * turretOffset;
+                            const turretBaseRadius = 12;
+                    
+                            // Outward by default
+							// DOnt know what this does for now. 
+							//for some reason target Angle is not this.angle
+                            let dx = mouse.x - (this.x + Math.cos(baseAngle) * turretOffset);
+                            let dy = mouse.y - (this.y + Math.sin(baseAngle) * turretOffset);
+                            let targetAngle = Math.atan2(dy, dx);
+                    
+                            // Flip logic (optional, to prevent backfiring)
+                            let diff = (targetAngle - baseAngle) % (2 * Math.PI);
+                            if (diff < 0) diff += 2 * Math.PI;
+                            if (diff > Math.PI/2 && diff < 3 * Math.PI/2) {
+                                targetAngle += Math.PI;
+                            }
+                    
+                            ctx.save();
+                            // Already translated to tank center — just offset locally
+                            ctx.translate(Math.cos(baseAngle) * turretOffset, 
+							        Math.sin(baseAngle) * turretOffset);
+                            
+							// Draw barrel
+                            ctx.rotate(targetAngle);
+                            ctx.fillStyle = '#d3d3d3';
+                            ctx.fillRect(0, -this.barrelWidth / 2, this.barrelLength * (1.5/3),
+                     							this.barrelWidth * (2/3));
+                            ctx.strokeRect(0, -this.barrelWidth / 2, this.barrelLength * (1.5/3),
+                    							this.barrelWidth * (2/3));
+                            
+                            // Draw turret base
+                            ctx.fillStyle = '#888';
+                            ctx.beginPath();
+                            ctx.arc(0, 0, turretBaseRadius, 0, Math.PI * 2);
+                            ctx.fill();
+                            ctx.strokeStyle = '#000';
+                            ctx.lineWidth = 2;
+                            ctx.stroke();
+                    
+                            
+                            ctx.restore();
+                        }
+                    }/////////////
+                else if(this.class == 'tripleshot'){
+                   // Front barrel
+				   ctx.lineWidth = 2;
+				   ctx.fillStyle = "#d3d3d3";
+				   ctx.strokeStyle = '#000';
+                   ctx.fillRect(0, -this.barrelWidth/2, this.barrelLength, this.barrelWidth);
+                   ctx.strokeRect(0, -this.barrelWidth/2, this.barrelLength, this.barrelWidth);
+                   
+                   // side barrel 
+                   ctx.rotate(0.2 * Math.PI);
+                   ctx.fillRect(0, -this.barrelWidth/2, this.barrelLength, this.barrelWidth);
+                   ctx.strokeRect(0, -this.barrelWidth/2, this.barrelLength, this.barrelWidth);
+				   
+				   // side barrel 
+                   ctx.rotate(-0.4 * Math.PI);
+                   ctx.fillRect(0, -this.barrelWidth/2, this.barrelLength, this.barrelWidth);
+                   ctx.strokeRect(0, -this.barrelWidth/2, this.barrelLength, this.barrelWidth);
+				}
+				else if(this.class == 'hunter'){
+				    // LONG SLIM GUN
+					ctx.fillStyle = "#d3d3d3";
+                    ctx.strokeStyle = '#000';
+                    ctx.lineWidth = 2;
+	                
+                    ctx.beginPath();
+                    ctx.moveTo(0, -this.barrelWidth / 1.9 / 1.2); // top left
+                    ctx.lineTo(this.barrelLength * 1.05, -this.barrelWidth /1.9 /1.2); // top right
+                    ctx.lineTo(this.barrelLength * 1.05, this.barrelWidth/1.9 /1.2);  // bottom right
+                    ctx.lineTo(0, this.barrelWidth/1.9);  // bottom left
+                    ctx.closePath();
+	                
+                    ctx.fill();
+                    ctx.stroke();
+				    // BIG SHORT GUN
+				    ctx.fillStyle = "#d3d3d3";
+                    ctx.strokeStyle = '#000';
+                    ctx.lineWidth = 2;
+	                
+                    ctx.beginPath();
+                    ctx.moveTo(0, -this.barrelWidth/1.25); // top left
+                    ctx.lineTo(this.barrelLength/1.1, -this.barrelWidth /1.25); // top right
+                    ctx.lineTo(this.barrelLength/1.1, this.barrelWidth/1.25);  // bottom right
+                    ctx.lineTo(0, this.barrelWidth/1.25);  // bottom left
+                    ctx.closePath();
+	                
+                    ctx.fill();
+                    ctx.stroke();
+					
+					
+					
+				}
+                else if(this.class == 'trapper'){
+				    // long trig
+				     ctx.fillStyle = "#999999";
+                    ctx.strokeStyle = '#000';
+                    ctx.lineWidth = 2.5;
+	                
+                    ctx.beginPath();
+                    ctx.moveTo(0, 0); // top left
+                    ctx.lineTo(this.barrelLength/1.1, -this.barrelWidth); // top right
+                    ctx.lineTo(this.barrelLength/1.1, this.barrelWidth);  // bottom right
+                    ctx.lineTo(0, 0);  // bottom left
+                    ctx.closePath();
+                    ctx.fill();
+					ctx.stroke();
+					
+					// big base rect
+					ctx.fillStyle = "#999999";
+                    ctx.strokeStyle = '#000';
+                    ctx.lineWidth = 2.5;
+	                
+                    ctx.beginPath();
+                    ctx.moveTo(0, -this.barrelWidth/1.2); // top left
+                    ctx.lineTo(this.barrelLength/1.5, -this.barrelWidth/1.5); // top right
+                    ctx.lineTo(this.barrelLength/1.5, this.barrelWidth/1.5);  // bottom right
+                    ctx.lineTo(0, this.barrelWidth/1.2);  // bottom left
+                    ctx.closePath();
+	                
+                    ctx.fill();
+                    ctx.stroke();
+				
 				}
 				ctx.restore()
 				
@@ -959,35 +1366,62 @@
         }
 
         class Bullet {
-            constructor(x, y, angle, fromPlayer , of_class = 'tank', of_speed = 12 , of_damage = 9, of_pen = 10) {
+            constructor(x, y, angle, fromPlayer , of_class = 'tank', of_speed = 12 , of_damage = 9, of_pen = 10, of_size = 6) {
                 this.x = x;
                 this.y = y;
                 this.angle = angle;
                 this.speed = of_speed;
-                this.size = 6;
+                this.size = of_size;
 				this.class = of_class;
 				this.life = 90;
 				this.health = of_pen;
 				this.damage = of_damage;
-				console.log(of_damage);
-	            if(of_class == 'sniper'){
+				this.slowness = 0;
+				if(of_class == 'trapper'){
+				    this.life = 1000;
+					this.slowness = 0.3; // higher -->  slower
+					this.speed = 20;
+					this.health = 100;
+					this.size = 12;
+				}
+	            if(of_class == 'sniper' || of_class == 'assasin'){
 					this.life = 120;
 					this.size = 9;
+					this.speed = 15;
 				}
-				else if(of_class == 'twin' || of_class == 'machine_gun' || of_class == 'flank_guard') {
+				else if(of_class == 'twin' || of_class == 'machine_gun' || of_class == 'flank_guard' 
+				|| of_class == 'tri_angle' || of_class == 'quad_tank' 
+				|| of_class == "twin_flank" || of_class == 'auto_3' || of_class == 'tripleshot') {
 					this.size = 9;
 				}
-				else{
-					this.size = 6;
+				else if(of_class == 'destroyer'){
+				    this.size = 20;
 				}
+				else if(of_class == 'gunner'){
+				    this.size = 6;
+				}
+				else if(of_class == 'tank'){
+				    this.size = 6;
+				}
+				else if(!(of_class == 'hunter' || of_class == 'trapper')){ // if not different bullets.
+				    this.size = 6;
+				}
+				
 				
                 this.fromPlayer = fromPlayer;
                 this.color = fromPlayer ? '#00b2e1' : '#f14e54';
             }
             
             update() {
-                this.x += Math.cos(this.angle) * this.speed;
+			    this.x += Math.cos(this.angle) * this.speed;
                 this.y += Math.sin(this.angle) * this.speed;
+			    if(this.class == 'trapper'){
+				    this.speed *= (1-this.slowness);
+				}
+				
+                   
+				
+				
                 this.life--;
                 // Check collision with other bullets
                 for (let i = bullets.length - 1; i >= 0; i--) {
@@ -1080,13 +1514,37 @@
                 return this.health <= 0;
             }
             draw() {
-                ctx.fillStyle = this.color;
-                ctx.beginPath();
-                ctx.arc(this.x - cameraX, this.y - cameraY, this.size, 0, Math.PI * 2);
-                ctx.fill();
-                ctx.strokeStyle = '#000';
-                ctx.lineWidth = 2;
-                ctx.stroke();
+                ctx.save();
+                ctx.translate(this.x - cameraX, this.y - cameraY);
+                ctx.rotate(this.angle);
+	            
+                if (this.class === 'trapper') {
+                    // Draw a triangle-style trapper bullet
+                    const size = this.size;
+	            
+                    ctx.beginPath();
+                    ctx.moveTo(size, 0);
+                    ctx.lineTo(-size * 0.6, size * 0.8);
+                    ctx.lineTo(-size * 0.6, -size * 0.8);
+                    ctx.closePath();
+	            
+                    ctx.fillStyle = this.color;
+                    ctx.fill();
+                    ctx.lineWidth = 2;
+                    ctx.strokeStyle = '#444'; // outline color
+                    ctx.stroke();
+                } else {
+                    // Default circular bullet
+                    ctx.beginPath();
+                    ctx.arc(0, 0, this.size, 0, Math.PI * 2);
+                    ctx.fillStyle = this.color;
+                    ctx.fill();
+                    ctx.lineWidth = 2;
+                    ctx.strokeStyle = '#000';
+                    ctx.stroke();
+                }
+
+    ctx.restore();
             }
         }
 
@@ -1412,11 +1870,10 @@
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             
             drawGrid();
-            
+            bullets.forEach(bullet => bullet.draw());
             shapes.forEach(shape => shape.draw());
             enemies.forEach(enemy => enemy.draw());
             if (player) player.draw();
-            bullets.forEach(bullet => bullet.draw());
             particles.forEach(particle => particle.draw());
             drawXCursor(mouseX  , mouseY );
             // Update UI
@@ -1460,7 +1917,12 @@
                 player.shoot(player_class); // Immediate shot on click
             }
         });
-        
+		
+		// For auto-3. already defined mouseX,Y but i want this too, non normalised.
+        canvas.addEventListener('mousemove', e => {
+            mouse.x = e.clientX;
+            mouse.y = e.clientY;
+        });
         canvas.addEventListener('mouseup', (e) => {
             if (e.button === 0) {
                 isMouseDown = false;
