@@ -118,8 +118,8 @@
             left: 0;
             width: 100%;
             height: 100%;
-            background-color: rgba(0, 0, 0, 0.8);
-            color: red;
+            background-color: rgba(0, 0, 0, 0.4);
+            color: #1E90FF;
             font-size: 72px;
             display: none;
             justify-content: center;
@@ -135,8 +135,64 @@
             font-size: 24px;
             background: #333;
             color: white;
-            border: 2px solid red;
+            border: #1E90FF;
             cursor: pointer;
+		
+		}
+		.upgrade-btn {
+            position: relative;
+            padding: 10px 15px;
+            margin: 5px;
+            border: none;
+            border-radius: 6px;
+            color: white;
+            font-family: 'Arial', sans-serif;
+            font-weight: bold;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            min-width: 160px;
+            transition: all 0.2s ease;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        }
+        
+        .upgrade-value {
+            font-size: 16px;
+            background-color: rgba(0,0,0,0.2);
+            padding: 2px 8px;
+            border-radius: 12px;
+        }
+        
+        /* Color assignments for full buttons */
+        #healthUpgrade { background-color: #E49B5A; }
+        #healthmaxUpgrade { background-color: #E24EE3; }
+        #bodydamageUpgrade { background-color: #8072EC; }
+        #bulletspeedUpgrade { background-color: #4C9FE6; }
+        #bulletpenUpgrade { background-color: #E9D44D; }
+        #damageUpgrade { background-color: #E34A45; }
+        #reloadUpgrade { background-color: #8BE94A; color: #333; }
+        #speedUpgrade { background-color: #55DCE9; color: #333; }
+        
+        /* Hover effects */
+        .upgrade-btn:not([disabled]):hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+            filter: brightness(1.1);
+        }
+        
+        .upgrade-btn:not([disabled]):active {
+            transform: translateY(1px);
+        }
+        
+        /* Disabled state */
+        .upgrade-btn[disabled] {
+            opacity: 0.7;
+            filter: grayscale(30%);
+            cursor: not-allowed;
+        }
+
+
         }
     </style>
 </head>
@@ -166,13 +222,46 @@
         <div id="levelText">Level 1</div>
         <div id="levelFill"></div>
     </div>
-    
+	
+	
     <div id="upgrades">
-        <button class="upgrade-btn" id="healthUpgrade" disabled>Health Regen (+)</button>
-        <button class="upgrade-btn" id="damageUpgrade" disabled>Bullet Damage (+)</button>
-        <button class="upgrade-btn" id="speedUpgrade" disabled>Movement Speed (+)</button>
-        <button class="upgrade-btn" id="reloadUpgrade" disabled>Reload Speed (+)</button>
+    <button class="upgrade-btn" id="healthUpgrade" disabled>
+        <span class="upgrade-text">Health Regen</span>
+        <span class="upgrade-value" >0</span>
+    </button>
+    <button class="upgrade-btn" id="healthmaxUpgrade" disabled>
+        <span class="upgrade-text">Max Health</span>
+        <span class="upgrade-value" >0</span>
+    </button>
+	<button class="upgrade-btn" id="bodydamageUpgrade" disabled>
+        <span class="upgrade-text">Body Damage</span>
+        <span class="upgrade-value" >0</span>
+    </button>
+	<button class="upgrade-btn" id="bulletspeedUpgrade" disabled>
+        <span class="upgrade-text">Bullet Speed</span>
+        <span class="upgrade-value" >0</span>
+    </button>
+	<button class="upgrade-btn" id="bulletpenUpgrade" disabled>
+        <span class="upgrade-text">Bullet Penetration</span>
+        <span class="upgrade-value" >0</span>
+    </button>
+	<button class="upgrade-btn" id="damageUpgrade" disabled>
+        <span class="upgrade-text">Bullet Damage</span>
+        <span class="upgrade-value" >0</span>
+    </button>
+	<button class="upgrade-btn" id="reloadUpgrade" disabled>
+        <span class="upgrade-text">Reload Speed</span>
+        <span class="upgrade-value" >0</span>
+    </button>
+	<button class="upgrade-btn" id="speedUpgrade" disabled>
+        <span class="upgrade-text">Movement Speed</span>
+        <span class="upgrade-value" >0</span>
+    </button>
+    <!-- Repeat for other buttons with different colors -->
     </div>
+	
+	
+    
 
     <script>
         const canvas = document.getElementById('gameCanvas');
@@ -186,7 +275,7 @@
         let mouseY = 0;
         let cameraX = 0;
         let cameraY = 0;
-        
+        let isMouseDown = false;
         // Input handling
         const keys = {};
         
@@ -204,14 +293,19 @@
         let xpToNext = 100;
         let skillPoints = 0;
         let epsilon = 30;
-		let epsilon_decay = 0.95;
+		let epsilon_decay = 0.9999;
 		let player_class = 'machine_gun';
         // Upgrades
         let upgrades = {
+		    health_reg: 0,
             health: 0,
-            damage: 0,
-            speed: 0,
-            reload: 0
+			body_damage: 0,
+			bullet_speed: 0,
+			penetration: 0,
+            damage: 0,   // !!! the upgrade is called damage NOT this.entity_upgrade.bullet_damage.
+            reload: 0,
+			speed: 0
+            
         };
         
 		function drawXCursor(x, y, size = 20, color = 'black', thickness = 2) {
@@ -249,34 +343,87 @@
 				else{
 				   this.class = player_class;
 				}
+				
+				
+				this.entity_upgrades = isPlayer ? upgrades : {
+		            health_reg: 0,
+                    health: 0,
+		        	body_damage: 0,
+		        	bullet_speed: 0,
+		        	penetration: 0, // same here.
+                    damage: 0,  // !!! the upgrade is called damage NOT this.entity_upgrade.bullet_damage.
+                    reload: 0,
+		        	speed: 0
+                    
+                };
+				// tank stats
+				this.maxSpeed = 3; // Store base speed
+				this.acceleration = 0.2;
+				this.maxHealth = 100;
+				this.body_damage = 20;
+				this.shootCooldown = 600;
+				this.bullet_speed = 9;
+				this.bullet_pen = 10;
+				this.bullet_damage = 7;
+				
+				this.entity_level = isPlayer ? level : (Math.floor(Math.random() * 45) + 1)
+				
+				// handle classes;
+				if(this.class == 'machine_gun'){
+				    this.shootCooldown = 120;
+				}
+				else if(this.class == 'sniper'){
+				    this.shootCooldown = 700;
+				}
+				else if(this.class == 'flank_guard'){
+				    this.shootCooldown = 300;
+				}
+				else if(this.class == 'twin'){
+				    this.shootCooldown = 230;
+				}
+				
+				
+				
                 this.x = x;
                 this.y = y;
+				this.velocity = { x: 0, y: 0 };
+                this.friction = 0.93; // Friction coefficient (0.9-0.99)
+                this.speed = 0; // Current speed
                 this.size = 30;
                 this.health = 100;
-                this.maxHealth = 100;
+				//healing stats
+				this.lastDamageTime = 0;
+                this.healDelay = 5000; // 5 seconds delay
+                this.baseHealRate = 2; // HP per second
+                this.healInterval = 1000; // Heal every second
+                this.lastHealTime = 0;
+				
                 this.angle = 0;
-                this.speed = 3;
                 this.isPlayer = isPlayer;
                 this.color = isPlayer ? '#00b2e1' : '#f14e54';
                 this.barrelLength = 55;
                 this.barrelWidth = 20;
 				this.barrelType = this.class;
                 this.lastShot = 0;
-                this.shootCooldown = 300;
-				// handle classes;
-				if(this.class == 'machine_gun'){
-				    this.shootCooldown = 80;
+				this.twinToggle = false; // for alternating twin fire
+				this.recentlyHit = false; // For damage cooldown
+                this.lastCollisionTime = 0; // Track collision timing
+				
+				this.barrelShake = {
+                    intensity: 0,
+                    offset: { x: 0, y: 0 },
+                    maxIntensity: 5,         // Maximum recoil distance
+                    isRecoiling: false,      // Track recoil state
+                    recoilSpeed: 0.3,        // Speed of recoil animation
+                    returnSpeed: 0.2,        // Speed of return animation
+                    active: false            // New flag to track active state
+                };
+				this.recoilForce = 0;
+                this.maxRecoil = this.isPlayer ? 1.5 : 1; // Enemy gets stronger recoil
+				if(this.class =='flank_guard'){
+				     this.maxRecoil = 0;
 				}
-				else if(this.class == 'sniper'){
-				    this.shootCooldown = 500;
-					this.barrelLength = 65;
-				}
-				else if(this.class == 'flank_guard'){
-				    this.shootCooldown = 300;
-				}
-				else if(this.class == 'twin'){
-				    this.shootCooldown = 300;
-				}
+                this.recoilDecay = 0.9;
                 this.ai = isPlayer ? null : {
                     target: null,
                     lastDirection: 0,
@@ -290,44 +437,263 @@
                 } else {
                     this.updateAI();
                 }
-                
-                // Health regeneration
-                if (this.health < this.maxHealth) {
-                    this.health += 0.1 + (upgrades.health * 0.05);
-                    if (this.health > this.maxHealth) this.health = this.maxHealth;
+                if (this.recoilForce > 0.1) {
+                    this.x -= Math.cos(this.angle) * this.recoilForce;
+                    this.y -= Math.sin(this.angle) * this.recoilForce;
+                    this.recoilForce *= this.recoilDecay;
+                } else {
+                    this.recoilForce = 0;
                 }
+				
+                // Health regeneration (only if not at max health)
+                if (this.health < this.maxHealth) {
+                    const now = Date.now();
+                    
+                    // Check if 5 seconds have passed since last damage
+                    if (now - this.lastDamageTime > this.healDelay) {
+                        
+                        // Check if it's time to heal (once per second)
+                        if (now - this.lastHealTime > this.healInterval) {
+                            const healAmount = this.baseHealRate + (this.entity_upgrades.health_reg * 0.7);
+                            this.health = Math.min(this.health + healAmount, this.maxHealth);
+                            this.lastHealTime = now;
+                            
+                            // Optional: Add heal particles
+                            if (this.isPlayer) {
+                                particles.push(new Particle(
+                                    this.x, this.y, 
+                                    '#00FF00', // Green heal effect
+                                    1.5, // Size
+                                    30 // Duration
+                                ));
+                            }
+                        }
+                    }
+                } 
+				
+				// regen
+				this.baseHealRate = this.maxHealth * (0.03 + (this.entity_upgrades.health_reg * 0.018));
+				// Max hp
+				this.maxHealth = 50 + (2 * (this.entity_level - 1)) + (this.entity_upgrades.health * 20);// exactly diep io
+				if(this.isPlayer) console.log("this health is "  + this.maxHealth);
+				//this.health = Math.min(this.health, this.maxHealth); // Preserve current health but cap at max
+				//body damage
+				this.body_damage = 1 + ((this.entity_upgrades.body_damage +5 ) * 4);
+				// bullet speed
+				this.bullet_speed = 4 + (this.entity_upgrades.bullet_speed * 2);
+				//bullet penetration
+				this.bullet_pen = 2 + (1.5 * this.entity_upgrades.penetration);
+				//bullet damage
+				
+				// !!! the upgrade is called damage NOT this.entity_upgrade.bullet_damage.
+				this.bullet_damage = 7 + (3 * this.entity_upgrades.damage);
+				
+				// reload
+				this.shootCooldown = 600 - (40 * this.entity_upgrades.reload);
+				// max speed
+				this.maxSpeed = 3 +( this.entity_upgrades.speed * 0.5);
+				
+				
+				if (this.health <= 0 && this.isPlayer) {
 				// dead
-				if (this.health <= 0) {
                      document.getElementById('death-screen').style.display = 'flex';
 					 gameRunning = false;
                 }
+				// Barrel recoil animation
+                if (this.barrelShake.active) {
+                    if (!this.barrelShake.isRecoiling) {
+                        // Recoil phase - move backward
+                        const recoilX = Math.cos(this.angle) * this.barrelShake.recoilSpeed;
+                        const recoilY = Math.sin(this.angle) * this.barrelShake.recoilSpeed;
+                        
+                        this.barrelShake.offset.x -= recoilX;
+                        this.barrelShake.offset.y -= recoilY;
+                        
+                        // Check if reached max recoil
+                        const currentOffset = Math.hypot(this.barrelShake.offset.x, this.barrelShake.offset.y);
+                        if (currentOffset >= this.barrelShake.maxIntensity) {
+                            this.barrelShake.isRecoiling = true;
+                        }
+                    } else {
+                        // Return phase - smooth return
+                        this.barrelShake.offset.x *= (1 - this.barrelShake.returnSpeed);
+                        this.barrelShake.offset.y *= (1 - this.barrelShake.returnSpeed);
+                        
+                        // Check if completed
+                        if (Math.hypot(this.barrelShake.offset.x, this.barrelShake.offset.y) < 0.1) {
+                            this.barrelShake.offset = { x: 0, y: 0 };
+                            this.barrelShake.active = false;
+                            this.barrelShake.intensity = 0;
+                            this.barrelShake.isRecoiling = false;
+                        }
+                    }
+                }
+				for (const other of enemies.concat(player)) {
+                    if (other === this) continue;
+                    const dx = other.x - this.x;
+                    const dy = other.y - this.y;
+                    const dist = Math.hypot(dx, dy);
+                    const minDist = this.size + other.size;
+                    if (dist < minDist) {
+                        const overlap = minDist - dist;
+                        const nx = dx / dist;
+                        const ny = dy / dist;
+	                
+                        if (this.isPlayer) {
+                            // Player gets pushed back
+                            this.x -= nx * overlap * 0.5;
+                            this.y -= ny * overlap * 0.5;
+                        } else {
+                            // Enemy gets pushed away
+                            other.x += nx * overlap * 0.5;
+                            other.y += ny * overlap * 0.5;
+                        }
+						// Apply mutual damage
+                         if (!this.recentlyHit) {
+                             if(this.takeDamage(other.body_damage) && this.isPlayer){
+							     document.getElementById('death-screen').style.display = 'flex';
+					             gameRunning = false;
+							 }
+                             if(other.takeDamage(this.body_damage)){
+							      enemies.splice(enemies.indexOf(other), 1);
+								  particles.push(new DeathEffect(other.x, other.y, this.angle, other.color));
+								  addXP(100); // 100 exp per tank kill;
+							 }
+                             
+                             
+							 if(this.speed < 10){// Add cooldown to prevent rapid damage
+                                this.recentlyHit = true;
+                                setTimeout(() => this.recentlyHit = false, 500);
+							 }
+                         }
+                    }
+                }
+				for (const shape of shapes) {
+                     const dx = shape.x - this.x;
+                     const dy = shape.y - this.y;
+                     const dist = Math.hypot(dx, dy);
+                     const minDist = this.size + shape.size;
+                     
+                     if (dist < minDist) {
+                         // Calculate push direction
+                         const nx = dx / dist;
+                         const ny = dy / dist;
+                         const overlap = minDist - dist;
+                         
+                         // Size-based push factors (pentagon pushes more)
+                         const shapePushFactor = shape.type === 'pentagon' ? 0.7 : 
+                                              shape.type === 'triangle' ? 0.5 : 0.4;
+                         const playerPushFactor = 0.5;
+                         
+                         // Apply push to both
+                         this.x -= nx * overlap * playerPushFactor;
+                         this.y -= ny * overlap * playerPushFactor;
+                         shape.x += nx * overlap * shapePushFactor;
+                         shape.y += ny * overlap * shapePushFactor;
+                         
+                         // Apply mutual damage
+                         if (!this.recentlyHit) {
+                             if(this.takeDamage(shape.body_damage) && this.isPlayer){
+							     document.getElementById('death-screen').style.display = 'flex';
+					             gameRunning = false;
+							 }
+                             if(shape.takeDamage(this.body_damage)){
+							      shapes.splice(shapes.indexOf(shape), 1);
+								  particles.push(new DeathEffect(shape.x, shape.y, this.angle, shape.color));
+								  addXP(shape.xp); // shape exp per shape kill;
+							 }
+                             
+                             if(this.speed < 10){// Add cooldown to prevent rapid damage
+                                this.recentlyHit = true;
+                                setTimeout(() => this.recentlyHit = false, 500);
+							 }
+                         }
+                         
+                         // Create collision particles
+                         for (let i = 0; i < 3; i++) {
+                             particles.push(new Particle(
+                                 (this.x + shape.x) / 2,
+                                 (this.y + shape.y) / 2,
+                                 this.color
+                             ));
+                         }
+                     }
+               }
             }
             
             updatePlayer() {
-                // Movement
-                let dx = 0, dy = 0;
-                if (keys['w'] || keys['ArrowUp']) dy -= 1;
-                if (keys['s'] || keys['ArrowDown']) dy += 1;
-                if (keys['a'] || keys['ArrowLeft']) dx -= 1;
-                if (keys['d'] || keys['ArrowRight']) dx += 1;
+			    this.level = level;
+                // Handle acceleration-based movement
+                let moveX = 0;
+                let moveY = 0;
                 
-                if (dx !== 0 || dy !== 0) {
-                    const magnitude = Math.sqrt(dx * dx + dy * dy);
-                    dx /= magnitude;
-                    dy /= magnitude;
-                    
-                    this.x += dx * (this.speed + upgrades.speed);
-                    this.y += dy * (this.speed + upgrades.speed);
+                // Get input direction
+                if (keys['w'] || keys['ArrowUp']) moveY -= 1;
+                if (keys['s'] || keys['ArrowDown']) moveY += 1;
+                if (keys['a'] || keys['ArrowLeft']) moveX -= 1;
+                if (keys['d'] || keys['ArrowRight']) moveX += 1;
+	            
+                // Normalize diagonal movement
+                if (moveX !== 0 && moveY !== 0) {
+                    const len = Math.sqrt(moveX * moveX + moveY * moveY);
+                    moveX /= len;
+                    moveY /= len;
                 }
-                
-                // Aiming
+	            
+                // Apply acceleration
+                const effectiveMaxSpeed = this.maxSpeed + upgrades.speed;
+                if (moveX !== 0 || moveY !== 0) {
+                    this.velocity.x += moveX * this.acceleration;
+                    this.velocity.y += moveY * this.acceleration;
+                    
+                    // Limit speed
+                    const currentSpeed = Math.sqrt(this.velocity.x * this.velocity.x + this.velocity.y * this.velocity.y);
+                    if (currentSpeed > effectiveMaxSpeed) {
+                        const ratio = effectiveMaxSpeed / currentSpeed;
+                        this.velocity.x *= ratio;
+                        this.velocity.y *= ratio;
+                    }
+                } else {
+                    // Apply friction when no input
+                    this.velocity.x *= this.friction;
+                    this.velocity.y *= this.friction;
+                }
+	            
+                // Apply recoil (modifies velocity directly)
+                if (this.recoilForce > 0.1) {
+                    this.velocity.x -= Math.cos(this.angle) * this.recoilForce * 0.5;
+                    this.velocity.y -= Math.sin(this.angle) * this.recoilForce * 0.5;
+                    this.recoilForce *= this.recoilDecay;
+                } else {
+                    this.recoilForce = 0;
+                }
+	            
+                // Update position
+                this.x += this.velocity.x;
+                this.y += this.velocity.y;
+	            
+                // Keep in bounds (with bounce effect)
+                const bounce = 0.6;
+                if (this.x < this.size) {
+                    this.x = this.size;
+                    this.velocity.x *= -bounce;
+                } else if (this.x > 4000 - this.size) {
+                    this.x = 4000 - this.size;
+                    this.velocity.x *= -bounce;
+                }
+                if (this.y < this.size) {
+                    this.y = this.size;
+                    this.velocity.y *= -bounce;
+                } else if (this.y > 4000 - this.size) {
+                    this.y = 4000 - this.size;
+                    this.velocity.y *= -bounce;
+                }
+	            
+                // Aiming (unchanged)
                 const worldMouseX = mouseX + cameraX;
                 const worldMouseY = mouseY + cameraY;
                 this.angle = Math.atan2(worldMouseY - this.y, worldMouseX - this.x);
-                
-                // Keep in bounds
-                this.x = Math.max(this.size, Math.min(4000 - this.size, this.x));
-                this.y = Math.max(this.size, Math.min(4000 - this.size, this.y));
+			    
             }
             
             updateAI() {
@@ -337,18 +703,28 @@
                 let closestDist = Infinity;
                 let target = null;
                 
+				// Check for bullets #1 priority
+                for (const bullet of bullets) {
+				    if(!bullet.fromPlayer) continue;
+					
+                    const dist = Math.hypot(bullet.x - this.x, bullet.y - this.y);
+                    if (dist < closestDist && dist < 200) {
+                        target = bullet;
+                        closestDist = dist;
+                    }
+                }
+				// check player #2
                 if (player) {
                     const dist = Math.hypot(player.x - this.x, player.y - this.y);
-                    if (dist < 400) {
+                    if (dist < 900) {
                         target = player;
                         closestDist = dist;
                     }
                 }
-                
-                // Check for shapes
+				// Check for shapes #3
                 for (const shape of shapes) {
                     const dist = Math.hypot(shape.x - this.x, shape.y - this.y);
-                    if (dist < closestDist && dist < 200) {
+                    if (dist < closestDist && dist < 400) {
                         target = shape;
                         closestDist = dist;
                     }
@@ -358,13 +734,29 @@
                 
                 if (target) {
                     // Move towards target
+                    // Calculate direction to target
                     const dx = target.x - this.x;
                     const dy = target.y - this.y;
                     const dist = Math.hypot(dx, dy);
-                    
+                    const dirX = dx / dist;
+                    const dirY = dy / dist;
+		            
+                    // Apply acceleration toward target
                     if (dist > 100) {
-                        this.x += (dx / dist) * this.speed;
-                        this.y += (dy / dist) * this.speed;
+                        this.velocity.x += dirX * this.acceleration;
+                        this.velocity.y += dirY * this.acceleration;
+                    } else if (dist < 80) {
+                        // Back away if too close
+                        this.velocity.x -= dirX * this.acceleration * 0.5;
+                        this.velocity.y -= dirY * this.acceleration * 0.5;
+                    }
+		            
+                    // Limit speed
+                    const currentSpeed = Math.sqrt(this.velocity.x * this.velocity.x + this.velocity.y * this.velocity.y);
+                    if (currentSpeed > this.maxSpeed) {
+                        const ratio = this.maxSpeed / currentSpeed;
+                        this.velocity.x *= ratio;
+                        this.velocity.y *= ratio;
                     }
                     
                     // Aim at target
@@ -375,37 +767,92 @@
                         this.shoot(this.class);
                     }
                 } else {
-                    // Random movement
+                    // Wandering behavior with acceleration
                     if (now > this.ai.changeDirection) {
                         this.ai.lastDirection = Math.random() * Math.PI * 2;
                         this.ai.changeDirection = now + 2000 + Math.random() * 3000;
                     }
                     
-                    this.x += Math.cos(this.ai.lastDirection) * this.speed * 0.3;
-                    this.y += Math.sin(this.ai.lastDirection) * this.speed * 0.3;
+                    this.velocity.x += Math.cos(this.ai.lastDirection) * this.acceleration * 0.5;
+                    this.velocity.y += Math.sin(this.ai.lastDirection) * this.acceleration * 0.5;
                     this.angle = this.ai.lastDirection;
                 }
-                
+                // Apply friction
+                this.velocity.x *= this.friction;
+                this.velocity.y *= this.friction;
+	            
+                // Update position
+                this.x += this.velocity.x;
+                this.y += this.velocity.y;
+
                 // Keep in bounds
                 this.x = Math.max(this.size, Math.min(4000 - this.size, this.x));
                 this.y = Math.max(this.size, Math.min(4000 - this.size, this.y));
+				
+				
             }
             
             shoot(of_class = 'tank') {
                 const now = Date.now();
-                if (now - this.lastShot < this.shootCooldown - (upgrades.reload * 30)) return;
-                
+                const cooldown = this.shootCooldown;
+				
+                if (now - this.lastShot < cooldown) return;
+				
+				// Activate recoil systems
+                if (this.barrelShake.maxIntensity > 0) {
+                    this.barrelShake.intensity = this.barrelShake.maxIntensity;
+                    this.barrelShake.isRecoiling = false;
+                    this.barrelShake.active = true;
+                    this.barrelShake.offset = { x: 0, y: 0 }; // Reset offset
+                }
                 this.lastShot = now;
-                
-                const bulletX = this.x + Math.cos(this.angle) * this.barrelLength;
-                const bulletY = this.y + Math.sin(this.angle) * this.barrelLength;
-                
-                bullets.push(new Bullet(bulletX, bulletY, this.angle, this.isPlayer , of_class));
+	            
+                const baseX = this.x;
+                const baseY = this.y;
+	            
+                // General helper to spawn a bullet at a given angle
+                const fireBullet = (angle) => {
+                    const bulletX = baseX + Math.cos(angle) * this.barrelLength;
+                    const bulletY = baseY + Math.sin(angle) * this.barrelLength;
+                    bullets.push(new Bullet(bulletX, bulletY, angle, this.isPlayer, of_class, this.bullet_speed, this.bullet_damage, this.bullet_pen));
+                };
+	            
+                // Class-specific shooting
+                switch (of_class) {
+                    case 'flank_guard': {
+					    const spread = 0.15;
+					    const randomOffset = (Math.random() - 0.5) * spread;
+                        fireBullet(this.angle + randomOffset);                     // forward
+                        fireBullet(this.angle + Math.PI + randomOffset);           // backward
+                        break;
+	                }
+                    case 'twin':  {
+					    const spread = 0.15;
+					    const randomOffset = (Math.random() - 0.5) * spread;
+                        const twinOffset = 0.15; // radians
+                        const angleOffset = this.twinToggle ? -twinOffset : twinOffset;
+                        this.twinToggle = !this.twinToggle;
+                        fireBullet(this.angle + angleOffset + randomOffset);
+                        break;
+	                }
+                    case 'machine_gun': {
+                        const spread = 0.3; // max spread in radians
+                        const randomOffset = (Math.random() - 0.5) * spread;
+                        fireBullet(this.angle + randomOffset);
+                        break;
+	                }
+                    default: {
+					    const spread = 0.15;
+					    const randomOffset = (Math.random() - 0.5) * spread;
+                        fireBullet(this.angle + randomOffset);
+                        break;
+					}
+                }
             }
             
             takeDamage(damage) {
                 this.health -= damage;
-                
+                this.lastDamageTime = Date.now(); // Reset timer on damage
                 // Create damage particles
                 for (let i = 0; i < 5; i++) {
                     particles.push(new Particle(this.x, this.y, '#ff0000'));
@@ -419,8 +866,10 @@
                 ctx.translate(this.x - cameraX, this.y - cameraY);
                 
 				// Tank barrel (DEFAULT)
+				ctx.save();
+				ctx.translate(this.barrelShake.offset.x, this.barrelShake.offset.y);
+				ctx.rotate(this.angle);
 				if(this.class == 'tank'){
-                    ctx.rotate(this.angle);
                     ctx.fillStyle = "#d3d3d3";
                     ctx.fillRect(0, -this.barrelWidth/2, this.barrelLength, this.barrelWidth);
                     ctx.strokeStyle = '#000';
@@ -428,18 +877,29 @@
                     ctx.strokeRect(0, -this.barrelWidth/2, this.barrelLength, this.barrelWidth);
 				}
 				else if (this.class === 'twin') { // twin
-                    const offset = 10;
-                    ctx.fillRect(0, -this.barrelWidth/2 - offset, this.barrelLength, this.barrelWidth);
-                    ctx.strokeRect(0, -this.barrelWidth/2 - offset, this.barrelLength, this.barrelWidth);
-	                
-                    ctx.fillRect(0, -this.barrelWidth/2 + offset, this.barrelLength, this.barrelWidth);
-                    ctx.strokeRect(0, -this.barrelWidth/2 + offset, this.barrelLength, this.barrelWidth);
+				    ctx.lineWidth = 2;
+                    ctx.fillStyle = "#d3d3d3";
+                    const offset = 15;
+					
+                    ctx.fillRect(0, -this.barrelWidth/2.3 - offset, this.barrelLength, this.barrelWidth);
+					ctx.strokeStyle = '#000';
+                    ctx.strokeRect(0, -this.barrelWidth/2.3 - offset, this.barrelLength, this.barrelWidth);
+                    ctx.fillRect(0, -this.barrelWidth/2.3 + offset, this.barrelLength, this.barrelWidth);
+                    ctx.strokeRect(0, -this.barrelWidth/2.3 + offset, this.barrelLength, this.barrelWidth);
                 }
 				else if (this.class === 'sniper') { // twin
-                    // already adjusted
+                    // adjusted lenght;
+                    ctx.fillStyle = "#d3d3d3";
+                    ctx.fillRect(0, -this.barrelWidth/2, this.barrelLength * 1.15, this.barrelWidth);
+                    ctx.strokeStyle = '#000';
+                    ctx.lineWidth = 2;
+                    ctx.strokeRect(0, -this.barrelWidth/2, this.barrelLength * 1.15, this.barrelWidth);
                 }
 				else if (this.class === 'flank_guard') {
                    // Front barrel
+				   ctx.lineWidth = 2;
+				   ctx.fillStyle = "#d3d3d3";
+				   ctx.strokeStyle = '#000';
                    ctx.fillRect(0, -this.barrelWidth/2, this.barrelLength, this.barrelWidth);
                    ctx.strokeRect(0, -this.barrelWidth/2, this.barrelLength, this.barrelWidth);
                    
@@ -449,24 +909,24 @@
                    ctx.strokeRect(0, -this.barrelWidth/2, this.barrelLength, this.barrelWidth);
                 }
 				else if(this.class == 'machine_gun'){
-				    ctx.fillStyle = "#a0a0a0";
-                    ctx.strokeStyle = "#333";
+				    ctx.fillStyle = "#d3d3d3";
+                    ctx.strokeStyle = '#000';
                     ctx.lineWidth = 2;
 	                
                     ctx.beginPath();
-                    ctx.moveTo(0, -this.barrelWidth); // top left
-                    ctx.lineTo(this.barrelLength, -this.barrelWidth / 2); // top right
-                    ctx.lineTo(this.barrelLength, this.barrelWidth / 2);  // bottom right
-                    ctx.lineTo(0, this.barrelWidth);  // bottom left
+                    ctx.moveTo(0, -this.barrelWidth/2); // top left
+                    ctx.lineTo(this.barrelLength, -this.barrelWidth); // top right
+                    ctx.lineTo(this.barrelLength, this.barrelWidth);  // bottom right
+                    ctx.lineTo(0, this.barrelWidth/2);  // bottom left
                     ctx.closePath();
 	                
                     ctx.fill();
                     ctx.stroke();
 				}
+				ctx.restore()
 				
 				
-				
-                // Tank body
+				// Tank body
                 ctx.fillStyle = this.color;
                 ctx.beginPath();
                 ctx.arc(0, 0, this.size, 0, Math.PI * 2);
@@ -474,12 +934,11 @@
                 ctx.strokeStyle = '#000';
                 ctx.lineWidth = 3;
                 ctx.stroke();
-                
-                
-                
-                ctx.restore();
+                   
+				ctx.restore();
                 
                 // Health bar
+				
                 if (this.health < this.maxHealth) {
                     const barWidth = this.size * 2;
                     const barHeight = 6;
@@ -496,25 +955,34 @@
                     ctx.lineWidth = 1;
                     ctx.strokeRect(barX, barY, barWidth, barHeight);
                 }
+
             }
         }
 
         class Bullet {
-            constructor(x, y, angle, fromPlayer , of_class = 'tank') {
+            constructor(x, y, angle, fromPlayer , of_class = 'tank', of_speed = 12 , of_damage = 9, of_pen = 10) {
                 this.x = x;
                 this.y = y;
                 this.angle = angle;
-                this.speed = 12;
+                this.speed = of_speed;
                 this.size = 6;
+				this.class = of_class;
+				this.life = 90;
+				this.health = of_pen;
+				this.damage = of_damage;
+				console.log(of_damage);
 	            if(of_class == 'sniper'){
-                    this.damage = 60 + (upgrades.damage * 5);
+					this.life = 120;
+					this.size = 9;
 				}
-				else {
-				    this.damage = 20 + (upgrades.damage * 5);
+				else if(of_class == 'twin' || of_class == 'machine_gun' || of_class == 'flank_guard') {
+					this.size = 9;
+				}
+				else{
+					this.size = 6;
 				}
 				
                 this.fromPlayer = fromPlayer;
-                this.life = 120;
                 this.color = fromPlayer ? '#00b2e1' : '#f14e54';
             }
             
@@ -522,20 +990,55 @@
                 this.x += Math.cos(this.angle) * this.speed;
                 this.y += Math.sin(this.angle) * this.speed;
                 this.life--;
+                // Check collision with other bullets
+                for (let i = bullets.length - 1; i >= 0; i--) {
+                    const other = bullets[i];
+                    if (other === this) continue; // don't compare with itself
                 
+                    // Optional: prevent friendly-fire bullet collision
+                    if (this.fromPlayer === other.fromPlayer) continue;
+                
+                    const dist = Math.hypot(other.x - this.x, other.y - this.y);
+                    if (dist < this.size + other.size) {
+                        // Both bullets take damage from each other
+                        if (this.takeDamage(other.damage)) {
+						     particles.push(new Particle(other.x, other.y, other.color));
+						     return false;
+						}
+                        if (other.takeDamage(this.damage)) {
+						      bullets.splice(i, 1); // remove other bullet
+							  particles.push(new Particle(this.x, this.y, this.color));
+					    }
+                    }
+                }
                 // Check collision with tanks
                 const targets = this.fromPlayer ? enemies : (player ? [player] : []);
                 for (let i = targets.length - 1; i >= 0; i--) {
                     const target = targets[i];
                     const dist = Math.hypot(target.x - this.x, target.y - this.y);
                     if (dist < target.size + this.size) {
-                        if (target.takeDamage(this.damage)) {
-                            if (this.fromPlayer) {
-                                addXP(target.isPlayer ? 100 : 50);
-                                enemies.splice(i, 1);
-                            }
-                        }
-                        return false;
+					// collision
+					const overlap = target.size + this.size - dist;
+					const nx = (target.x-this.x)/ dist;
+					const ny = (target.y-this.y) / dist;
+					
+					this.x -= nx * overlap * 0.75; // collision push factor 0.75
+					this.y -= ny * overlap * 0.75;
+					
+					target.x += nx * overlap *0.75;
+					target.y += ny * overlap * 0.75;
+					
+					// if destroyed
+                       if (target.takeDamage(this.damage)) {
+                           if (this.fromPlayer) {
+                               addXP(target.isPlayer ? 100 : 50);
+                               enemies.splice(i, 1);
+                           }
+						particles.push(new DeathEffect(target.x, target.y, this.angle, target.color));
+                       }
+                       if(this.takeDamage(target.body_damage)){ // if bullet got 0 health;
+					    return false;
+					}
                     }
                 }
                 
@@ -544,20 +1047,39 @@
                     const shape = shapes[i];
                     const dist = Math.hypot(shape.x - this.x, shape.y - this.y);
                     if (dist < shape.size + this.size) {
+					// collision
+					const overlap = shape.size + this.size - dist;
+					const nx = (shape.x-this.x)/ dist;
+					const ny = (shape.y-this.y) / dist;
+					
+					this.x -= nx * overlap * 0.9;
+					this.y -= ny * overlap * 0.9;
+					
+					shape.x += nx * overlap *0.9;
+					shape.y += ny * overlap * 0.9;
+					// if destroyed
                         if (shape.takeDamage(this.damage)) {
                             if (this.fromPlayer) {
                                 addXP(shape.xp);
-                                score += shape.xp;
+                                
                             }
                             shapes.splice(i, 1);
+							particles.push(new DeathEffect(shape.x, shape.y, this.angle, shape.color));
                         }
-                        return false;
+						if(this.takeDamage(shape.body_damage)){ // if bullet got 0 health;
+						    return false;
+						}
+						
+                        
                     }
                 }
                 
                 return this.life > 0;
             }
-            
+            takeDamage(damage) {
+                this.health -= damage;
+                return this.health <= 0;
+            }
             draw() {
                 ctx.fillStyle = this.color;
                 ctx.beginPath();
@@ -575,7 +1097,8 @@
                 this.y = y;
                 this.type = type;
                 this.size = type === 'square' ? 15 : type === 'triangle' ? 20 : 35;
-                this.health = type === 'square' ? 10 : type === 'triangle' ? 20 : 50;
+                this.health = type === 'square' ? 10 : type === 'triangle' ? 20 : 100;
+				this.body_damage = type === 'square' ? 8 : type === 'triangle' ? 8 : 12;
                 this.maxHealth = this.health;
                 this.angle = 0;
                 this.rotationSpeed = 0.02;
@@ -584,7 +1107,30 @@
             }
             
             update() {
+                if(this.health <= 0) return false;
                 this.angle += this.rotationSpeed;
+			    for (const target of [...enemies , player]) {
+                    const dx = target.x - this.x;
+                    const dy = target.y - this.y;
+                    const dist = Math.hypot(dx, dy);
+                    const minDist = this.size + target.size;
+                    if (dist < minDist) {
+                        const overlap = minDist - dist;
+                        const nx = dx / dist;
+                        const ny = dy / dist;
+	                
+                        if (this.isPlayer) {
+                            // Player gets pushed back
+                            this.x -= nx * overlap;
+                            this.y -= ny * overlap;
+                        } else {
+                            // Shape gets pushed
+                            target.x += nx * overlap;
+                            target.y += ny * overlap;
+                        }
+                    }
+                }
+				
             }
             
             takeDamage(damage) {
@@ -633,9 +1179,54 @@
                 }
                 
                 ctx.restore();
+				
+				// Health bar
+                if (this.health < this.maxHealth) {
+                    const barWidth = this.size * 2;
+                    const barHeight = 6;
+                    const barX = this.x - cameraX - barWidth/2;
+                    const barY = this.y - cameraY - this.size - 15;
+                    
+                    ctx.fillStyle = '#ff0000';
+                    ctx.fillRect(barX, barY, barWidth, barHeight);
+                    
+                    ctx.fillStyle = '#00ff00';
+                    ctx.fillRect(barX, barY, barWidth * (this.health / this.maxHealth), barHeight);
+                    
+                    ctx.strokeStyle = '#000';
+                    ctx.lineWidth = 1;
+                    ctx.strokeRect(barX, barY, barWidth, barHeight);
+                }
             }
         }
-
+        class DeathEffect {
+            constructor(x, y, angle, color) {
+                this.x = x;
+                this.y = y;
+                this.angle = angle;
+                this.speed = 2;
+                this.alpha = 1;
+                this.size = 20;
+                this.color = color;
+            }
+	        
+            update() {
+                this.x += Math.cos(this.angle) * this.speed;
+                this.y += Math.sin(this.angle) * this.speed;
+                this.alpha -= 0.02;
+                return this.alpha > 0;
+            }
+	        
+            draw() {
+                ctx.save();
+                ctx.globalAlpha = this.alpha;
+                ctx.fillStyle = this.color;
+                ctx.beginPath();
+                ctx.arc(this.x - cameraX, this.y - cameraY, this.size, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+            }
+        }
         class Particle {
             constructor(x, y, color) {
                 this.x = x;
@@ -673,14 +1264,14 @@
             while (xp >= xpToNext) {
                 xp -= xpToNext;
                 level++;
-                xpToNext = Math.floor(xpToNext * 1.5);
+                //xpToNext = Math.floor(xpToNext * 1.5);
                 skillPoints++;
                 updateUI();
             }
+			score += Math.floor(xp);
 			epsilon *= epsilon_decay;
-			if(epsilon <= 1) epsilon = 1;
+			if(epsilon < 1) epsilon = 1;
         }
-
         function updateUI() {
             document.getElementById('score').textContent = score;
             document.getElementById('level').textContent = level;
@@ -693,9 +1284,8 @@
                 btn.disabled = skillPoints <= 0;
             });
         }
-
         function spawnShapes() {
-            while (shapes.length < 50) {
+            while (shapes.length < 100) {
                 const x = Math.random() * 4000;
                 const y = Math.random() * 4000;
                 const rand = Math.random();
@@ -703,9 +1293,8 @@
                 shapes.push(new Shape(x, y, type));
             }
         }
-
         function spawnEnemies() {
-            while (enemies.length < 8) {
+            while (enemies.length < 12) {
                 const x = Math.random() * 4000;
                 const y = Math.random() * 4000;
                 enemies.push(new Tank(x, y, false));
@@ -734,10 +1323,36 @@
                 ctx.stroke();
             }
         }
-
+        function updateUpgradeButton(buttonId, value) {
+           const button = document.getElementById(buttonId);
+           button.querySelector('.upgrade-value').textContent = value;
+           
+           // Enable/disable based on skill points
+           button.disabled = skillPoints <= 0;
+           
+           // Visual feedback when affordable
+           if (skillPoints > 0) {
+               button.style.boxShadow = '0 0 10px rgba(255, 255, 255, 0.5)';
+           } else {
+               button.style.boxShadow = 'none';
+         }
+}
         function gameLoop() {
             if (!gameRunning) return;
-            
+            if (isMouseDown && gameRunning && player) {
+                player.shoot(player_class);
+            }
+			// update upgrades
+			updateUpgradeButton('healthUpgrade', upgrades.health_reg);
+            updateUpgradeButton('damageUpgrade', upgrades.damage);
+            updateUpgradeButton('speedUpgrade', upgrades.speed);
+            updateUpgradeButton('reloadUpgrade', upgrades.reload);
+			updateUpgradeButton('bodydamageUpgrade', upgrades.body_damage);
+			updateUpgradeButton('bulletspeedUpgrade', upgrades.bullet_speed);
+			updateUpgradeButton('healthmaxUpgrade', upgrades.health);
+			updateUpgradeButton('bulletpenUpgrade', upgrades.penetration);
+			
+			
             // Update camera
             if (player) {
                 cameraX = player.x - canvas.width / 2;
@@ -811,39 +1426,71 @@
 			
         });
 
-        canvas.addEventListener('click', () => {
-            if (gameRunning && player) {
-                player.shoot(player_class);
+        // Replace your click event with these three events
+        canvas.addEventListener('mousedown', (e) => {
+            if (e.button === 0 && gameRunning && player) { // 0 = left mouse button
+                isMouseDown = true;
+                player.shoot(player_class); // Immediate shot on click
             }
         });
-
+        
+        canvas.addEventListener('mouseup', (e) => {
+            if (e.button === 0) {
+                isMouseDown = false;
+            }
+        });
+        
+        // Optional: Stop shooting if mouse leaves canvas
+        canvas.addEventListener('mouseleave', () => {
+            isMouseDown = false;
+        });
+    
         // Upgrade buttons
         document.getElementById('healthUpgrade').addEventListener('click', () => {
             if (skillPoints > 0) {
-                upgrades.health++;
+                upgrades.health_reg++;
                 skillPoints--;
-                player.maxHealth += 20;
-                player.health = Math.min(player.health + 20, player.maxHealth);
             }
         });
-
         document.getElementById('damageUpgrade').addEventListener('click', () => {
             if (skillPoints > 0) {
                 upgrades.damage++;
                 skillPoints--;
             }
         });
-
         document.getElementById('speedUpgrade').addEventListener('click', () => {
             if (skillPoints > 0) {
                 upgrades.speed++;
                 skillPoints--;
             }
         });
-
         document.getElementById('reloadUpgrade').addEventListener('click', () => {
             if (skillPoints > 0) {
                 upgrades.reload++;
+                skillPoints--;
+            }
+        });
+		document.getElementById('bodydamageUpgrade').addEventListener('click', () => {
+            if (skillPoints > 0) {
+                upgrades.body_damage++;
+                skillPoints--;
+            }
+        });
+		document.getElementById('bulletspeedUpgrade').addEventListener('click', () => {
+            if (skillPoints > 0) {
+                upgrades.bullet_speed++;
+                skillPoints--;
+            }
+        });
+		document.getElementById('healthmaxUpgrade').addEventListener('click', () => {
+            if (skillPoints > 0) {
+                upgrades.health++;
+                skillPoints--;
+            }
+        });
+		document.getElementById('bulletpenUpgrade').addEventListener('click', () => {
+            if (skillPoints > 0) {
+                upgrades.penetration++;
                 skillPoints--;
             }
         });
