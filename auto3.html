@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Diep.io Auto 3 Tank Demo</title>
+  <style>
+    body { margin: 0; overflow: hidden; background: #cdcdcd; }
+    canvas { display: block; }
+  </style>
+</head>
+<body>
+  <canvas id="gameCanvas"></canvas>
+  <script>
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    let w, h;
+    function resize() { w = canvas.width = window.innerWidth; h = canvas.height = window.innerHeight; }
+    window.addEventListener('resize', resize);
+    resize();
+
+    // Tank with three turrets
+    const tank = {
+      x: w/2, y: h/2,
+      bodyRadius: 30,
+      turretOffset: 25,        // increased offset to push turrets outside
+      turretBaseRadius: 12,
+      barrelLength: 25,
+      barrelWidth: 6,
+      bodyAngle: 0,
+      bodyRotationSpeed: 0.001, // radians per ms
+    };
+
+    // Control mode: 'auto', 'towards', 'away'
+    let controlMode = 'auto';
+    canvas.addEventListener('mousedown', e => {
+      if (e.button === 0) controlMode = 'towards';
+      if (e.button === 2) controlMode = 'away';
+    });
+    canvas.addEventListener('mouseup', e => { controlMode = 'auto'; });
+    canvas.addEventListener('contextmenu', e => e.preventDefault());
+
+    // Mouse position
+    const mouse = { x: w/2, y: h/2 };
+    canvas.addEventListener('mousemove', e => { mouse.x = e.clientX; mouse.y = e.clientY; });
+
+    function draw() {
+      ctx.clearRect(0, 0, w, h);
+
+      // Rotate body
+      tank.bodyAngle += tank.bodyRotationSpeed * 16;
+
+      // Draw tank body
+      ctx.save();
+      ctx.translate(tank.x, tank.y);
+      ctx.rotate(tank.bodyAngle);
+      ctx.fillStyle = '#4aa';
+      ctx.beginPath();
+      ctx.arc(0, 0, tank.bodyRadius, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = '#000'; ctx.lineWidth = 2;
+      ctx.stroke();
+      ctx.restore();
+
+      // Draw turrets
+      for (let i = 0; i < 3; i++) {
+        const baseAngle = tank.bodyAngle + i * (2 * Math.PI / 3);
+        const bx = tank.x + Math.cos(baseAngle) * tank.turretOffset;
+        const by = tank.y + Math.sin(baseAngle) * tank.turretOffset;
+
+        // Compute raw target angle to mouse (or away)
+        let targetAngle = Math.atan2(mouse.y - by, mouse.x - bx);
+        if (controlMode === 'away') targetAngle += Math.PI;
+
+        // Prevent barrel from pointing into the body
+        // Find difference between base direction and target
+        let diff = (targetAngle - baseAngle) % (2 * Math.PI);
+        if (diff < 0) diff += 2 * Math.PI;
+        // If pointing towards center (diff between 90° and 270°), flip
+        if (diff > Math.PI/2 && diff < 3 * Math.PI/2) {
+          targetAngle += Math.PI;
+        }
+
+        // Draw turret base
+        ctx.save();
+        ctx.translate(bx, by);
+        ctx.fillStyle = '#888';
+        ctx.beginPath();
+        ctx.arc(0, 0, tank.turretBaseRadius, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = '#000'; ctx.lineWidth = 2;
+        ctx.stroke();
+
+        // Draw barrel
+        ctx.rotate(targetAngle);
+        ctx.fillStyle = '#d3d3d3';
+        ctx.fillRect(0, -tank.barrelWidth/2, tank.barrelLength, tank.barrelWidth);
+        ctx.strokeRect(0, -tank.barrelWidth/2, tank.barrelLength, tank.barrelWidth);
+        ctx.restore();
+      }
+
+      requestAnimationFrame(draw);
+    }
+    draw();
+  </script>
+</body>
+</html>
